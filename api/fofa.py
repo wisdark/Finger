@@ -7,13 +7,15 @@ import random
 import requests
 from urllib.parse import quote
 from config.data import logging,Urls,Ips
-from config.config import Fofa_key,Fofa_email,Fofa_Size,user_agents
+from config.config import Fofa_key,Fofa_email,user_agents
+import readline
+
 
 class Fofa:
     def __init__(self):
         self.email = Fofa_email
         self.key = Fofa_key
-        self.size = Fofa_Size
+        self.size = 100
         self.headers = {
             "User-Agent": random.choice(user_agents)
         }
@@ -23,8 +25,20 @@ class Fofa:
                     ip = "ip={}".format(ip)
                     self.run(ip)
             else:
-                keyword = input("请输入查询关键词:").strip()
-                self.run(keyword)
+                try:
+                    logging.info("[FOFA Example]domain=example.com\n")
+                    while 1:
+                        keyword = input("请输入查询关键词:").strip()
+                        size = input("请输入查询的数量(默认100):").strip()
+                        self.size = int(size) if size else 100
+                        if keyword == "":
+                            logging.error("\n关键字不能为空！")
+                        else:
+                            break
+                    self.run(keyword)
+                except KeyboardInterrupt:
+                    logging.error("\n用户取消输入！直接退出。")
+                    exit(0)
         else:
             logging.error("fofa api不可用，请检查配置是否正确！")
 
@@ -32,7 +46,7 @@ class Fofa:
         logging.info("正在调用fofa进行收集资产。。。。")
         logging.info("查询关键词为:{0},查询数量为:{1}".format(keyword,self.size))
         keyword = quote(str(base64.b64encode(keyword.encode()), encoding='utf-8'))
-        url = "https://fofa.so/api/v1/search/all?email={0}&key={1}&qbase64={2}&full=false&fields=protocol,host&size={3}".format(
+        url = "https://fofa.info/api/v1/search/all?email={0}&key={1}&qbase64={2}&full=false&fields=protocol,host&size={3}".format(
             self.email, self.key, keyword, self.size)
         try:
             response = requests.get(url,timeout=10,headers = self.headers )
@@ -40,16 +54,15 @@ class Fofa:
             if "results" in datas.keys():
                 for data in datas["results"]:
                     _url = ""
-                    if "http" == data[0] or "https" == data[0]:
-                        _url = "{0}://{1}".format(data[0], data[1])
-                    elif "http" in data[1] or "https" in data[1]:
+                    if "http" in data[1] or "https" in data[1]:
                         _url = data[1]
-                    elif "" is data[0]:
+                    elif "http" == data[0] or "https" == data[0]:
+                        _url = "{0}://{1}".format(data[0], data[1])
+                    elif "" == data[0]:
                         _url = "{0}://{1}".format("http", data[1])
                     if _url:
                         logging.info(_url)
                         Urls.url.append(_url)
-
         except requests.exceptions.ReadTimeout:
             logging.error("请求超时")
         except requests.exceptions.ConnectionError:
@@ -63,7 +76,7 @@ class Fofa:
     def check(self):
         try:
             if self.email and self.key:
-                auth_url = "https://fofa.so/api/v1/info/my?email={0}&key={1}".format(self.email, self.key)
+                auth_url = "https://fofa.info/api/v1/info/my?email={0}&key={1}".format(self.email, self.key)
                 response = requests.get(auth_url, timeout=10, headers=self.headers)
                 if self.email in response.text:
                     return True
